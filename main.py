@@ -1,4 +1,6 @@
+import time
 import pygame  # type: ignore
+import music
 
 pygame.init()
 WIDTH, HEIGHT = 800, 550
@@ -7,95 +9,118 @@ pygame.display.set_caption("EIIT Project Test")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 32)
 
-# UI layout setup
+# layout vars
 NUM_SLIDERS = 5
 x_margin = 80
 spacing = (WIDTH - 2 * x_margin) // NUM_SLIDERS
-slider_x_positions = [x_margin + spacing // 2 + i * spacing for i in range(NUM_SLIDERS)]
+slider_x = [x_margin + spacing // 2 + i * spacing for i in range(NUM_SLIDERS)]
 slider_y = 80
-slider_height = 380
-slider_width = 12
-knob_radius = 20
+slider_h = 380
+slider_w = 12
+knob_r = 20
 
-knob_ys = [slider_y for _ in range(NUM_SLIDERS)]
-dragging_index = None
+# initial values and per-slider maxima
+initial_values = [0.0, 25.0, 50.0, 75.0, 100.0]
+max_values =     [10.0, 50.0, 200.0, 75.0, 150.0]
 
-def knob_to_value(knob_y):
-    t = (knob_y - slider_y) / slider_height
-    return 1.0 - max(0.0, min(1.0, t))
-
-
-# Global state container
+# state
 state = {
-    "knob_ys": knob_ys,
-    "dragging_index": dragging_index,
+    # committed states
+    "values": list(initial_values),
+    "prev_values": list(initial_values),
+
+    # knob states
+    "pending": list(initial_values),
+    "knob_ys": [0] * NUM_SLIDERS,
+    "drag": None,
+
+    # general states
     "running": True,
-    "last_update_time": 0,
-    "values": [0.0] * NUM_SLIDERS
+    "last_commit": 0.0,
+    "commit_interval": 0.5, # seconds
 }
 
-# INPUT HANDLER
-def handle_inputs(state):
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            state["running"] = False
+def value_to_knob(val, maxv):
+    t = 0.0 if maxv == 0 else (1.0 - (val / maxv))
+    return int(slider_y + max(0.0, min(1.0, t)) * slider_h)
 
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mx, my = event.pos
-            for i, x in enumerate(slider_x_positions):
-                ky = state["knob_ys"][i]
-                if (mx - x)**2 + (my - ky)**2 <= (knob_radius + 5)**2:
-                    state["dragging_index"] = i
+def knob_to_value(ky, maxv):
+    t = (ky - slider_y) / slider_h
+    return maxv * (1.0 - max(0.0, min(1.0, t)))
+
+# initialize knob positions from committed values
+for i in range(NUM_SLIDERS):
+    state["knob_ys"][i] = value_to_knob(state["values"][i], max_values[i])
+
+def handle_inputs(st):
+    for ev in pygame.event.get():
+        if ev.type == pygame.QUIT:
+            st["running"] = False
+        elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+            mx, my = ev.pos
+            for i, x in enumerate(slider_x):
+                if (mx - x) ** 2 + (my - st["knob_ys"][i]) ** 2 <= (knob_r + 5) ** 2:
+                    st["drag"] = i
                     break
+        elif ev.type == pygame.MOUSEBUTTONUP and ev.button == 1:
+            st["drag"] = None
+        elif ev.type == pygame.MOUSEMOTION and st["drag"] is not None:
+            _, my = ev.pos
+            i = st["drag"]
+            ky = max(slider_y, min(slider_y + slider_h, my))
+            st["knob_ys"][i] = ky
+            st["pending"][i] = round(knob_to_value(ky, max_values[i]), 3)
 
-        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            state["dragging_index"] = None
+def commit_pending(st):
+    now = time.time()
+    if now - st["last_commit"] >= st["commit_interval"] and st["pending"] != st["values"]:
+        st["prev_values"] = list(st["values"])
+        st["values"] = list(st["pending"])
+        st["last_commit"] = now
+        # sync knob positions to committed values for non-dragged sliders
+        for i in range(NUM_SLIDERS):
+            if st["drag"] != i:
+                st["knob_ys"][i] = value_to_knob(st["values"][i], max_values[i])
+        print("\rCommitted values:", [round(v, 3) for v in st["values"]], end="", flush=True)
+        return True
+    return False
 
-        elif event.type == pygame.MOUSEMOTION and state["dragging_index"] is not None:
-            _, my = event.pos
-            i = state["dragging_index"]
-            state["knob_ys"][i] = max(slider_y, min(slider_y + slider_height, my))
+def drawUI(scr, st):
+    scr.fill((25, 25, 30))
+    for i, x in enumerate(slider_x):
+        pygame.draw.rect(scr, (220, 220, 220), (x - slider_w // 2, slider_y, slider_w, slider_h))
+        color = (255, 80, 80) if st["drag"] == i else (230, 60, 60)
+        pygame.draw.circle(scr, color, (x, int(st["knob_ys"][i])), knob_r)
+        lab = font.render(f"S{i+1}", True, (255, 255, 180))
+        lab_y = slider_y + slider_h + 6
+        scr.blit(lab, (x - lab.get_width() // 2, lab_y))
+        # show committed value on UI (not pending)
+        val_str = f"{st['values'][i]:.3f}"
+        val_txt = font.render(val_str, True, (0, 255, 255))
+        scr.blit(val_txt, (x - val_txt.get_width() // 2, lab_y + lab.get_height() + 6))
 
-def draw_ui(screen, state):
-    screen.fill((25, 25, 30))
+# main loop: only redraw when committed values changed
+last_snapshot = list(state["values"])
+drawUI(screen, state)
+pygame.display.flip()
 
-    for i, x in enumerate(slider_x_positions):
-        # Slider bar
-        pygame.draw.rect(screen, (220, 220, 220),
-                         (x - slider_width // 2, slider_y, slider_width, slider_height))
-
-        # Slider knob
-        knob_color = (255, 80, 80) if state["dragging_index"] == i else (230, 60, 60)
-        pygame.draw.circle(screen, knob_color, (x, int(state["knob_ys"][i])), knob_radius)
-
-        # Label
-        label = font.render(f"S{i+1}", True, (255, 255, 180))
-        label_y = slider_y + slider_height + 10
-        screen.blit(label, (x - label.get_width() // 2, label_y))
-        # Value text
-        val = f"{state['values'][i]:.3f}"
-        value_text = font.render(val, True, (0, 255, 255))
-        value_y = label_y + label.get_height() + 8
-        screen.blit(value_text, (x - value_text.get_width() // 2, value_y))
-
-
-# limit value updation at 2 times per second
-def update_values(state):
-    now = pygame.time.get_ticks()  # milliseconds
-    if now - state["last_update_time"] >= 500:  # 500 ms = 0.5 sec → 2 updates per second
-        state["last_update_time"] = now
-        state["values"] = [knob_to_value(k) for k in state["knob_ys"]]
-
-        print("Updated values:", [round(v, 3) for v in state["values"]])
-
-
-#  main loop
 while state["running"]:
     handle_inputs(state)
-    update_values(state)
-    draw_ui(screen, state)
 
-    pygame.display.flip()
+    # when not dragging, keep pending & knob synced to committed values
+    if state["drag"] is None:
+        for i in range(NUM_SLIDERS):
+            state["knob_ys"][i] = value_to_knob(state["values"][i], max_values[i])
+            state["pending"][i] = state["values"][i]
+
+    committed = commit_pending(state)
+
+    # if committed changed OR external code changed state["values"], redraw
+    if committed or state["values"] != last_snapshot:
+        drawUI(screen, state)
+        pygame.display.flip()
+        last_snapshot = list(state["values"])
+    
     clock.tick(60)
 
 pygame.quit()
