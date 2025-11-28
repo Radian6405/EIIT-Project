@@ -2,6 +2,7 @@ import time
 import pygame
 import music
 import arduino
+import config
 
 pygame.init()
 WIDTH, HEIGHT = 800, 550
@@ -21,10 +22,10 @@ slider_w = 12
 knob_r = 20
 
 # initial values and per-slider maxima
-initial_values = [300, 300, 300, 300, 300]
-max_values =     [300, 300, 300, 300, 300]
-sensitivity = [10, 10, 50, 10, 10]
-sustain_threshold = 200
+initial_values = list(config.INITIAL_VALUES)
+max_values = list(config.MAX_VALUES)
+sensitivity = list(config.SENSITIVITY)
+sustain_threshold = config.SUSTAIN_THRESHOLD
 
 # state
 state = {
@@ -86,7 +87,7 @@ def commit_pending(st):
         for i in range(NUM_SLIDERS):
             if st["drag"] != i:
                 st["knob_ys"][i] = value_to_knob(st["values"][i], max_values[i])
-        print("\rCommitted values:", [round(v, 3) for v in st["values"]], end="      ", flush=True)
+        print("Committed values:", [round(v, 3) for v in st["values"]], end="   ", flush=True)
         return True
     return False
 

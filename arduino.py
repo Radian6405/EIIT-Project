@@ -25,7 +25,7 @@ def update_state(state, sustain_threshold):
             return
 
     # If all parts are valid integers
-    print("Numbers list:", numbers)
+    # print("Numbers list:", numbers)
 
     # sustain logic
     state["dist"] = numbers[-1]
