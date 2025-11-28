@@ -1,6 +1,7 @@
 import time
-import pygame  # type: ignore
-import music
+import pygame
+#import music
+import arduino
 
 pygame.init()
 WIDTH, HEIGHT = 800, 550
@@ -21,7 +22,7 @@ knob_r = 20
 
 # initial values and per-slider maxima
 initial_values = [0.0, 25.0, 50.0, 75.0, 100.0]
-max_values =     [10.0, 50.0, 200.0, 75.0, 150.0]
+max_values =     [10.0, 50.0, 400, 75.0, 150.0]
 
 # state
 state = {
@@ -81,7 +82,7 @@ def commit_pending(st):
         for i in range(NUM_SLIDERS):
             if st["drag"] != i:
                 st["knob_ys"][i] = value_to_knob(st["values"][i], max_values[i])
-        print("\rCommitted values:", [round(v, 3) for v in st["values"]], end="", flush=True)
+        print("\rCommitted values:", [round(v, 3) for v in st["values"]], end="      ", flush=True)
         return True
     return False
 
@@ -100,28 +101,33 @@ def drawUI(scr, st):
         scr.blit(val_txt, (x - val_txt.get_width() // 2, lab_y + lab.get_height() + 6))
 
 # main loop: only redraw when committed values changed
-last_snapshot = list(state["values"])
-drawUI(screen, state)
-pygame.display.flip()
+def run_UI():
+    last_snapshot = list(state["values"])
+    drawUI(screen, state)
+    pygame.display.flip()
 
-while state["running"]:
-    handle_inputs(state)
+    while state["running"]:
+        handle_inputs(state)
+        arduino.update_state(state)
 
-    # when not dragging, keep pending & knob synced to committed values
-    if state["drag"] is None:
-        for i in range(NUM_SLIDERS):
-            state["knob_ys"][i] = value_to_knob(state["values"][i], max_values[i])
-            state["pending"][i] = state["values"][i]
+        # when not dragging, keep pending & knob synced to committed values
+        # if state["drag"] is None:
+        #     for i in range(NUM_SLIDERS):
+        #         state["knob_ys"][i] = value_to_knob(state["values"][i], max_values[i])
+        #         state["pending"][i] = state["values"][i]
 
-    committed = commit_pending(state)
+        committed = commit_pending(state)
 
-    # if committed changed OR external code changed state["values"], redraw
-    if committed or state["values"] != last_snapshot:
-        drawUI(screen, state)
-        pygame.display.flip()
-        last_snapshot = list(state["values"])
-    
-    clock.tick(60)
+        # if committed changed OR external code changed state["values"], redraw
+        if committed or state["values"] != last_snapshot:
+            drawUI(screen, state)
+            pygame.display.flip()
+            last_snapshot = list(state["values"])
+        
+        clock.tick(60)
 
-pygame.quit()
-print()
+    pygame.quit()
+    print()
+
+if __name__ == "__main__":
+    run_UI()
