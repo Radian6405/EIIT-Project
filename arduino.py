@@ -4,11 +4,11 @@ import time
 def setup():
     global arduino
 
-    # arduino = serial.Serial('/dev/ttyACM0', 9600)  # Linux
-    arduino = serial.Serial('COM7', 9600)       # Windows
+    arduino = serial.Serial('/dev/ttyUSB0', 9600)  # Linux
+    # arduino = serial.Serial('COM7', 9600)       # Windows
     time.sleep(5)  # wait for Arduino reset
 
-def update_state(state, sustain_threshold):
+def update_state(state):
     line = arduino.readline().decode(errors="ignore").strip()
 
     if not line:
@@ -27,9 +27,12 @@ def update_state(state, sustain_threshold):
     # If all parts are valid integers
     # print("Numbers list:", numbers)
 
+    # ultrasonic distance
+    state["distance"] = numbers[-1]
+    numbers = numbers[:-1]
+
     # sustain logic
-    state["dist"] = numbers[-1]
-    if numbers[-1] < sustain_threshold:
+    if numbers[-1] == 1:
         state["sustain"] = True
     else:
         state["sustain"] = False

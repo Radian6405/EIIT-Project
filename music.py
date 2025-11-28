@@ -117,21 +117,13 @@ def generate_music(state, sensitivity, bend_range=None):
 
     vals = state.get("values", [])
     prevs = state.get("prev_values", [])
-    raw_dist = state.get("dist", 0.0)
+    raw_dist = state.get("distance", 0.0)
 
     # normalize raw_dist to a scalar controller
-    if isinstance(raw_dist, (list, tuple)):
-        if len(raw_dist) == 0:
-            dist_val = 0.0
-        elif len(raw_dist) == 1:
-            dist_val = float(raw_dist[0])
-        else:
-            dist_val = float(sum(raw_dist) / len(raw_dist))
-    else:
-        try:
-            dist_val = float(raw_dist)
-        except Exception:
-            dist_val = 0.0
+    try:
+        dist_val = float(raw_dist)
+    except Exception:
+        dist_val = 0.0
 
     # compute semitone offset from global controller
     semitones_global = dist_val * float(bend_range)
@@ -145,8 +137,8 @@ def generate_music(state, sensitivity, bend_range=None):
 
     # if lengths mismatch, operate on min length
     deltas = [vals[i] - prevs[i] for i in range(5)]
-    if vals != prevs:
-        print("Deltas:", deltas)
+    # if vals != prevs:
+    print("Deltas:", deltas)
     print(f"raw_dist={raw_dist} -> dist_val={dist_val:.3f} -> semitones_global={semitones_global:.3f}")
 
     mapping = {0: "C", 1: "D", 2: "E", 3: "F", 4: "B"}
@@ -173,41 +165,41 @@ def shutdown():
 
 
 # Demo when run as main
-if __name__ == "__main__":
-    # demo state and sensitivity
-    sample_state = {
-        "values": [0.0, 0.0, 0.0, 0.0, 0.0],
-        "prev_values": [0.0, 0.0, 0.0, 0.0, 0.0],
-        "dist": 0.0,   # global pitch controller: -1.0 .. +1.0 -> ±BEND_RANGE semitones
-        "sustain": False,
-    }
-    sens = [0.05, 0.05, 0.05, 0.05, 0.05]
+# if __name__ == "__main__":
+#     # demo state and sensitivity
+#     sample_state = {
+#         "values": [0.0, 0.0, 0.0, 0.0, 0.0],
+#         "prev_values": [0.0, 0.0, 0.0, 0.0, 0.0],
+#         "dist": 0.0,   # global pitch controller: -1.0 .. +1.0 -> Â±BEND_RANGE semitones
+#         "sustain": False,
+#     }
+#     sens = [0.05, 0.05, 0.05, 0.05, 0.05]
 
-    try:
-        print("Demo: start C")
-        start_note("C", semitone_offset=0.0)
+#     try:
+#         print("Demo: start C")
+#         start_note("C", semitone_offset=0.0)
         
-        print("Now simulate a trigger to start C via generate_music and bend up")
-        sample_state["prev_values"] = [0.0, 0.0, 0.0, 0.0, 0.0]
-        sample_state["values"] = [-1.0, 0.0, 0.0, 0.0, 0.0]  # start C
-        sample_state["dist"] = 0.7
-        generate_music(sample_state, sens)
-        time.sleep(0.5)
+#         print("Now simulate a trigger to start C via generate_music and bend up")
+#         sample_state["prev_values"] = [0.0, 0.0, 0.0, 0.0, 0.0]
+#         sample_state["values"] = [-1.0, 0.0, 0.0, 0.0, 0.0]  # start C
+#         sample_state["dist"] = 0.7
+#         generate_music(sample_state, sens)
+#         time.sleep(0.5)
 
-        print("Bend globally down while keeping C playing")
-        sample_state["prev_values"] = sample_state["values"].copy()
-        sample_state["values"] = sample_state["prev_values"]
-        sample_state["dist"] = -0.6
-        generate_music(sample_state, sens)
-        time.sleep(0.5)
+#         print("Bend globally down while keeping C playing")
+#         sample_state["prev_values"] = sample_state["values"].copy()
+#         sample_state["values"] = sample_state["prev_values"]
+#         sample_state["dist"] = -0.6
+#         generate_music(sample_state, sens)
+#         time.sleep(0.5)
 
-        print("Stop C using generate_music logic (simulate release)")
-        sample_state["prev_values"] = sample_state["values"].copy()
-        sample_state["values"] = [1.0, 0.0, 0.0, 0.0, 0.0]
-        sample_state["dist"] = 0.0
-        generate_music(sample_state, sens)
-        time.sleep(0.3)
+#         print("Stop C using generate_music logic (simulate release)")
+#         sample_state["prev_values"] = sample_state["values"].copy()
+#         sample_state["values"] = [1.0, 0.0, 0.0, 0.0, 0.0]
+#         sample_state["dist"] = 0.0
+#         generate_music(sample_state, sens)
+#         time.sleep(0.3)
 
-    finally:
-        print("Cleaning up synth")
-        shutdown()
+#     finally:
+#         print("Cleaning up synth")
+#         shutdown()

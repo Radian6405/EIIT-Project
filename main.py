@@ -25,7 +25,6 @@ knob_r = 20
 initial_values = list(config.INITIAL_VALUES)
 max_values = list(config.MAX_VALUES)
 sensitivity = list(config.SENSITIVITY)
-sustain_threshold = config.SUSTAIN_THRESHOLD
 
 # state
 state = {
@@ -45,7 +44,7 @@ state = {
     # general states
     "running": True,
     "last_commit": 0.0,
-    "commit_interval": 0.5, # seconds
+    "commit_interval": 0.01, # seconds
 }
 
 def value_to_knob(val, maxv):
@@ -82,7 +81,7 @@ def handle_inputs(st):
 def commit_pending(st):
     now = time.time()
     st["prev_values"] = list(st["values"])
-    if now - st["last_commit"] >= st["commit_interval"] and st["pending"] != st["values"]:
+    if now - st["last_commit"] >= 0 and st["pending"] != st["values"]:
         st["values"] = list(st["pending"])
         st["last_commit"] = now
         # sync knob positions to committed values for non-dragged sliders
@@ -120,10 +119,10 @@ def run_UI():
     drawUI(screen, state)
     pygame.display.flip()
 
+    arduino.setup()
     while state["running"]:
         handle_inputs(state)
-        arduino.setup()
-        arduino.update_state(state, sustain_threshold)
+        arduino.update_state(state)
         music.generate_music(state, sensitivity)
 
         # when not dragging, keep pending & knob synced to committed values
