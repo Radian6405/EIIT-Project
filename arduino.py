@@ -6,7 +6,7 @@ def setup():
 
     arduino = serial.Serial('/dev/ttyUSB0', 9600)  # Linux
     # arduino = serial.Serial('COM7', 9600)       # Windows
-    time.sleep(5)  # wait for Arduino reset
+    time.sleep(2)  # wait for Arduino reset
 
 def update_state(state):
     line = arduino.readline().decode(errors="ignore").strip()

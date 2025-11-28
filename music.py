@@ -1,7 +1,7 @@
 import time
 import config
 
-# FluidSynth-only configuration
+# FluidSynth configuration
 SOUNDFONT = "soundfonts/SalC5Light2.sf2"
 try:
     from fluidsynth import Synth
@@ -10,6 +10,8 @@ except Exception as e:
         "fluidsynth is required for this script. Install with: pip install pyfluidsynth\n"
         f"Original error: {e}"
     )
+
+# Initialize FluidSynth
 synth = Synth()
 try:
     synth.start()
@@ -25,11 +27,11 @@ except Exception as e:
     synth.delete()
     raise RuntimeError(f"Failed to load SoundFont '{SOUNDFONT}': {e}")
 
-# Runtime state
+# Runtime global state
 active_channels = {}
 playing_notes = set()
-sustain_mode = False   # track sustain state
-note_release_times = {}  # note -> timestamp when retrigger allowed
+sustain_mode = False
+note_release_times = {}
 
 # Helpers
 def semitones_to_midi_pitchbend(semitones, bend_range=config.BEND_RANGE):
@@ -50,6 +52,29 @@ def semitones_to_midi_pitchbend(semitones, bend_range=config.BEND_RANGE):
         val = max_val
     return val
 
+def map_distance_to_pitchbend(distance, in_min=5.0, in_max=20.0):
+    """
+    Map a distance value (expected in range in_min..in_max) to MIDI pitch-bend 0..16383.
+    Values outside the range are clamped.
+    """
+    try:
+        d = float(distance)
+    except Exception:
+        d = in_min
+
+    if d <= in_min:
+        return 0
+    if d >= in_max:
+        return 16383
+
+    span = in_max - in_min
+    frac = (d - in_min) / span
+    pb = int(round(frac * 16383))
+    if pb < 0:
+        pb = 0
+    if pb > 16383:
+        pb = 16383
+    return pb
 
 # Start / Stop using only FluidSynth
 def start_note(note, semitone_offset=0.0, velocity=127):       
@@ -106,15 +131,7 @@ def stop_note(note):
     if (not sustain_mode):
         force_stop_note(note)
 
-def reset_pitch_wheel():
-    """Reset global pitch wheel (center) on the MIDI channel."""
-    try:
-        synth.pitch_bend(config.DEFAULT_MIDI_CHANNEL, 8192)
-    except Exception as e:
-        print("Failed to reset pitch wheel:", e)
-
-
-# generate_music (global pitch via state["dist"])
+# main function
 def generate_music(state, sensitivity, bend_range=None):
     if bend_range is None:
         bend_range = config.BEND_RANGE
@@ -134,114 +151,40 @@ def generate_music(state, sensitivity, bend_range=None):
     except Exception:
         dist_val = 0.0
 
-    # compute semitone offset from global controller
-    semitones_global = dist_val * float(bend_range)
-
     # apply pitch-bend immediately to the channel (affects all sounding notes)
     try:
-        pb = semitones_to_midi_pitchbend(semitones_global, bend_range=bend_range)
+        pb = map_distance_to_pitchbend(dist_val, in_min= config.DISTANCE_MIN, in_max=config.DISTANCE_MAX)
         synth.pitch_bend(config.DEFAULT_MIDI_CHANNEL, pb)
     except Exception as e:
         print("Failed to apply pitch bend:", e)
 
-    # CALCULATE DELTAS
+    # calculate deltas
     deltas = [vals[i] - prevs[i] for i in range(5)]
-    if deltas is not None and deltas[0] < -4 and deltas[1] < -4 and deltas[2] < -4 and deltas[3] < -4:
-        print("Deltas:", deltas)
-        print(f"raw_dist={raw_dist} -> dist_val={dist_val:.3f} -> semitones_global={semitones_global:.3f}")
+    print("Deltas:", deltas)
+    print(f"raw_dist={raw_dist} -> dist_val={dist_val:.3f} -> pitchbend={pb}")
 
-    # mapping = {0: "C", 1: "D", 2: "E", 3: "F", 4: "B"}
-    mapping = {0: "C", 1: "D", 2: "E", 3: "F"}
-
+    # process each sensor
     for i, delta in enumerate(deltas):
-        note = mapping.get(i)
+        note = config.PIN_TO_NOTE.get(i)
         if note is None:
             continue
 
         if delta < -sensitivity[i]:
             print("START PLAYING: ", note)
-            start_note(note, semitone_offset=semitones_global)
+            start_note(note, semitone_offset=0.0)
         elif delta > sensitivity[i]:
             print("STOP PLAYING: ", note)
             stop_note(note)
         else:
             pass
     
-    for note in mapping.values():
+    # resets after note time if sustain is on
+    # this is required to allow retriggering of notes after a delay
+    for note in config.PIN_TO_NOTE.values():
         if note_release_times.get(note):
             last_released_time =  note_release_times[note]
-            # print(last_released_time, time.time(), time.time() - last_released_time , config.NOTE_TIME)
             if time.time() - last_released_time < config.NOTE_TIME:
-                print("Note", note, "is still in release time, cannot retrigger yet.")
                 return
             else:
-                print("Note", note, "release time passed, can retrigger now.")
-                print(playing_notes)
-                print(active_channels)
                 force_stop_note(note)
                 note_release_times.pop(note, None)
-
-# Shutdown helper
-def shutdown():
-    try:
-        synth.delete()
-    except Exception:
-        pass
-
-
-# Demo when run as main
-if __name__ == "__main__":
-    # demo state and sensitivity
-    sample_state = {
-        "values": [0.0, 0.0, 0.0, 0.0, 0.0],
-        "prev_values": [0.0, 0.0, 0.0, 0.0, 0.0],
-        "dist": 0.0,   # global pitch controller: -1.0 .. +1.0 -> Â±BEND_RANGE semitones
-        "sustain": False,
-    }
-    sens = [0.05, 0.05, 0.05, 0.05, 0.05]
-
-    try:
-        
-        print("Play B")
-        start_note("B", semitone_offset=-90.0)
-        time.sleep(0.5)
-        # stop_note("B")
-        # print("Demo: start C")
-        # start_note("C", semitone_offset=0.0)
-        # time.sleep(0.5)
-
-        print("change pitch")
-        pb = semitones_to_midi_pitchbend(90.0, bend_range=config.BEND_RANGE)
-        synth.pitch_bend(config.DEFAULT_MIDI_CHANNEL, pb)
-        time.sleep(3.0)
-        # stop_note("B")
-
-        # start_note("C", semitone_offset=0.0)
-        # time.sleep(3)
-        # start_note("D", semitone_offset=0.0)
-        # time.sleep(3)
-        
-        # print("Now simulate a trigger to start C via generate_music and bend up")
-        # sample_state["prev_values"] = [0.0, 0.0, 0.0, 0.0, 0.0]
-        # sample_state["values"] = [-1.0, 0.0, 0.0, 0.0, 0.0]  # start C
-        # sample_state["dist"] = 0.7
-        # generate_music(sample_state, sens)
-        # time.sleep(0.5)
-
-        # print("Bend globally down while keeping C playing")
-        # sample_state["prev_values"] = sample_state["values"].copy()
-        # sample_state["values"] = sample_state["prev_values"]
-        # sample_state["dist"] = -0.6
-        # generate_music(sample_state, sens)
-        # time.sleep(0.5)
-
-        # print("Stop C using generate_music logic (simulate release)")
-        # sample_state["prev_values"] = sample_state["values"].copy()
-        # sample_state["values"] = [1.0, 0.0, 0.0, 0.0, 0.0]
-        # sample_state["dist"] = 0.0
-        # generate_music(sample_state, sens)
-        # time.sleep(0.3)
-
-    finally:
-        print("Cleaning up synth")
-        shutdown()

@@ -92,7 +92,6 @@ def commit_pending(st):
         for i in range(NUM_SLIDERS):
             if st["drag"] != i:
                 st["knob_ys"][i] = value_to_knob(st["values"][i], max_values[i])
-        print("\rCommitted values:", [round(v, 3) for v in st["values"]], end="   ", flush=True)
         return True
     return False
 
