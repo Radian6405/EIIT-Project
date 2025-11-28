@@ -10,8 +10,11 @@ SENSITIVITY = [4, 4, 4, 4, 4]
 
 # Pitch / MIDI settings
 # semitones for dist=Â±1.0
-BEND_RANGE = 2.0  
+BEND_RANGE = 100.0  
 DEFAULT_MIDI_CHANNEL = 0
 
+# seconds to wait after sending noteoff before allowing the same note to be retriggered
+NOTE_TIME = 2.0
+
 # approximate MIDI note numbers for our notes (C4=60)
-NOTE_TO_MIDI = {"C": 60, "D": 62, "E": 64, "F": 65, "B": 59}
+NOTE_TO_MIDI = {"B": 59, "C": 60, "D": 62, "E": 64, "F": 65}

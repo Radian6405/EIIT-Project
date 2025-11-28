@@ -30,7 +30,7 @@ sensitivity = list(config.SENSITIVITY)
 state = {
     # committed states
     "values": list(initial_values),
-    "prev_values": list(initial_values),
+    "prev_values": [list(initial_values)],
     # from ultrasonic sensor
     "distance": 0.0,
     # from ir sensor
@@ -80,7 +80,11 @@ def handle_inputs(st):
 
 def commit_pending(st):
     now = time.time()
-    st["prev_values"] = list(st["values"])
+    st["prev_values"].append(list(st["values"]));
+
+    if (len(st["prev_values"]) > 5):
+        st["prev_values"].pop(0)
+
     if now - st["last_commit"] >= 0 and st["pending"] != st["values"]:
         st["values"] = list(st["pending"])
         st["last_commit"] = now
@@ -88,7 +92,7 @@ def commit_pending(st):
         for i in range(NUM_SLIDERS):
             if st["drag"] != i:
                 st["knob_ys"][i] = value_to_knob(st["values"][i], max_values[i])
-        print("Committed values:", [round(v, 3) for v in st["values"]], end="   ", flush=True)
+        print("\rCommitted values:", [round(v, 3) for v in st["values"]], end="   ", flush=True)
         return True
     return False
 
