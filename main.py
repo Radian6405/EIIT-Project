@@ -16,7 +16,7 @@ NUM_SLIDERS = 5
 x_margin = 80
 spacing = (WIDTH - 2 * x_margin) // NUM_SLIDERS
 slider_x = [x_margin + spacing // 2 + i * spacing for i in range(NUM_SLIDERS)]
-slider_y = 80
+slider_y = 100
 slider_h = 380
 slider_w = 12
 knob_r = 20
@@ -32,7 +32,9 @@ state = {
     # committed states
     "values": list(initial_values),
     "prev_values": list(initial_values),
+    # from ultrasonic sensor
     "distance": 0.0,
+    # from ir sensor
     "sustain": False,
 
     # knob states
@@ -93,8 +95,13 @@ def commit_pending(st):
 
 def drawUI(scr, st):
     scr.fill((25, 25, 30))
+    
     sustain_text = font.render(f"Sustain: {'On' if st['sustain'] else 'Off'}", True, (255, 255, 180))
     scr.blit(sustain_text, (WIDTH - sustain_text.get_width() - 20, 20))
+    
+    dist_text = font.render(f"Distance: {st['distance']:.2f}", True, (255, 255, 180))
+    scr.blit(dist_text, (WIDTH - dist_text.get_width() - 20, 50))
+
     for i, x in enumerate(slider_x):
         pygame.draw.rect(scr, (220, 220, 220), (x - slider_w // 2, slider_y, slider_w, slider_h))
         color = (255, 80, 80) if st["drag"] == i else (230, 60, 60)
