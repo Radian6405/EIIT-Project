@@ -1,6 +1,6 @@
 import time
 import pygame
-#import music
+import music
 import arduino
 
 pygame.init()
@@ -21,8 +21,9 @@ slider_w = 12
 knob_r = 20
 
 # initial values and per-slider maxima
-initial_values = [0.0, 25.0, 50.0, 75.0, 100.0]
-max_values =     [10.0, 50.0, 400, 75.0, 150.0]
+initial_values = [300, 300, 300, 300, 300]
+max_values =     [300, 300, 300, 300, 300]
+SENSITIVITY = 10
 
 # state
 state = {
@@ -74,8 +75,8 @@ def handle_inputs(st):
 
 def commit_pending(st):
     now = time.time()
+    st["prev_values"] = list(st["values"])
     if now - st["last_commit"] >= st["commit_interval"] and st["pending"] != st["values"]:
-        st["prev_values"] = list(st["values"])
         st["values"] = list(st["pending"])
         st["last_commit"] = now
         # sync knob positions to committed values for non-dragged sliders
@@ -108,7 +109,9 @@ def run_UI():
 
     while state["running"]:
         handle_inputs(state)
+        arduino.setup()
         arduino.update_state(state)
+        music.generate_music(state, SENSITIVITY)
 
         # when not dragging, keep pending & knob synced to committed values
         # if state["drag"] is None:
