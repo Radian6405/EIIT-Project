@@ -6,7 +6,7 @@ import arduino
 pygame.init()
 WIDTH, HEIGHT = 800, 550
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("EIIT Project Test")
+pygame.display.set_caption("EIIT Project")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 32)
 
@@ -23,13 +23,16 @@ knob_r = 20
 # initial values and per-slider maxima
 initial_values = [300, 300, 300, 300, 300]
 max_values =     [300, 300, 300, 300, 300]
-SENSITIVITY = 10
+sensitivity = [10, 10, 50, 10, 10]
+sustain_threshold = 200
 
 # state
 state = {
     # committed states
     "values": list(initial_values),
     "prev_values": list(initial_values),
+    "distance": 0.0,
+    "sustain": False,
 
     # knob states
     "pending": list(initial_values),
@@ -50,7 +53,7 @@ def knob_to_value(ky, maxv):
     t = (ky - slider_y) / slider_h
     return maxv * (1.0 - max(0.0, min(1.0, t)))
 
-# initialize knob positions from committed values
+# initialize knob positions
 for i in range(NUM_SLIDERS):
     state["knob_ys"][i] = value_to_knob(state["values"][i], max_values[i])
 
@@ -89,6 +92,8 @@ def commit_pending(st):
 
 def drawUI(scr, st):
     scr.fill((25, 25, 30))
+    sustain_text = font.render(f"Sustain: {'On' if st['sustain'] else 'Off'}", True, (255, 255, 180))
+    scr.blit(sustain_text, (WIDTH - sustain_text.get_width() - 20, 20))
     for i, x in enumerate(slider_x):
         pygame.draw.rect(scr, (220, 220, 220), (x - slider_w // 2, slider_y, slider_w, slider_h))
         color = (255, 80, 80) if st["drag"] == i else (230, 60, 60)
@@ -101,7 +106,7 @@ def drawUI(scr, st):
         val_txt = font.render(val_str, True, (0, 255, 255))
         scr.blit(val_txt, (x - val_txt.get_width() // 2, lab_y + lab.get_height() + 6))
 
-# main loop: only redraw when committed values changed
+# main logic
 def run_UI():
     last_snapshot = list(state["values"])
     drawUI(screen, state)
@@ -110,8 +115,8 @@ def run_UI():
     while state["running"]:
         handle_inputs(state)
         arduino.setup()
-        arduino.update_state(state)
-        music.generate_music(state, SENSITIVITY)
+        arduino.update_state(state, sustain_threshold)
+        music.generate_music(state, sensitivity)
 
         # when not dragging, keep pending & knob synced to committed values
         # if state["drag"] is None:
@@ -121,7 +126,7 @@ def run_UI():
 
         committed = commit_pending(state)
 
-        # if committed changed OR external code changed state["values"], redraw
+        # redraw on state change
         if committed or state["values"] != last_snapshot:
             drawUI(screen, state)
             pygame.display.flip()

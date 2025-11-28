@@ -91,10 +91,10 @@ def generate_music(state, sensitivity):
             note = "B"
 
         if note is not None:
-            if delta > sensitivity:
-                stop_note(note)
-            elif delta < -sensitivity:
+            if delta < -sensitivity[i]:
                 start_note(note)
+            elif delta > sensitivity[i] and not state["sustain"]:
+                stop_note(note)
 
 
 if __name__ == "__main__":
